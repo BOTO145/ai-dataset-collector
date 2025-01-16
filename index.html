@@ -21,6 +21,7 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             text-align: center;
             width: 500px;
+            overflow: hidden; /* Prevent overflow */
         }
         input, button {
             margin: 10px 0;
@@ -47,6 +48,8 @@
             flex-wrap: wrap;
             justify-content: center;
             margin-top: 15px;
+            max-height: 200px; /* Limit height of image container */
+            overflow-y: auto; /* Allow scrolling if too many images */
         }
         #imageContainer img {
             max-width: 100px;
@@ -95,7 +98,7 @@
         startCameraBtn.addEventListener('click', async () => {
             try {
                 // Check for camera permissions
-                mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                mediaStream = await navigator.mediaDevices.getUser Media({ 
                     video: { 
                         width: { ideal: 400 },
                         height: { ideal: 300 }
