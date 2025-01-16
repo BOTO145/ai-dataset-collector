@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Camera Capture Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 500px;
+        }
+        input, button {
+            margin: 10px 0;
+            padding: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #video, #canvas {
+            max-width: 100%;
+            margin: 10px 0;
+        }
+        #imageContainer {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        #imageContainer img {
+            max-width: 100px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Camera Capture Tool</h2>
+        
+        <input 
+            type="text" 
+            id="datasetName" 
+            placeholder="Enter Dataset Name"
+        >
+        
+        <video id="video" width="400" height="300" autoplay></video>
+        <canvas id="canvas" width="400" height="300" style="display:none;"></canvas>
+        
+        <button id="startCameraBtn">Start Camera</button>
+        <button id="startCaptureBtn" disabled>Start Capture</button>
+        <button id="pauseCaptureBtn" disabled>Pause Capture</button>
+        <button id="downloadBtn" disabled>Download Images</button>
+        
+        <div id="status"></div>
+        <div id="imageContainer"></div>
+    </div>
+
+    <script>
+        const datasetInput = document.getElementById('datasetName');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const startCaptureBtn = document.getElementById('startCaptureBtn');
+        const pauseCaptureBtn = document.getElementById('pauseCaptureBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const imageContainer = document.getElementById('imageContainer');
+        const statusDiv = document.getElementById('status');
+
+        let mediaStream = null;
+        let captureInterval;
+        let images = [];
+
+        // Start Camera
+        startCameraBtn.addEventListener('click', async () => {
+            try {
+                // Check for camera permissions
+                mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 400 },
+                        height: { ideal: 300 }
+                    } 
+                });
+                
+                video.srcObject = mediaStream;
+                
+                startCameraBtn.disabled = true;
+                startCaptureBtn.disabled = false;
+                statusDiv.textContent = 'Camera started. Ready to capture!';
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                statusDiv.textContent = 'Camera access denied. Check permissions.';
+            }
+        });
+
+        // Start Capture
+        startCaptureBtn.addEventListener('click', () => {
+            const datasetName = datasetInput.value.trim();
+            if (!datasetName) {
+                alert('Please enter a dataset name');
+                return;
+            }
+
+            startCaptureBtn.disabled = true;
+            pauseCaptureBtn.disabled = false;
+            downloadBtn.disabled = true;
+            statusDiv.textContent = 'Capturing images...';
+
+            images = []; // Reset images array
+            imageContainer.innerHTML = ''; // Clear previous images
+
+            captureInterval = setInterval(() => {
+                // Capture image from video stream
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Add timestamp to image
+                context.font = '16px Arial';
+                context.fillStyle = 'white';
+                context.fillText(new Date().toLocaleString(), 10, 30);
+
+                // Convert canvas to data URL
+                const imageDataUrl = canvas.toDataURL('image/png');
+                
+                // Create and display thumbnail
+                const imgElement = document.createElement('img');
+                imgElement.src = imageDataUrl;
+                imageContainer.appendChild(imgElement);
+
+                // Store full image
+                images.push(imageDataUrl);
+            }, 500);
+        });
+
+        // Pause Capture
+        pauseCaptureBtn.addEventListener('click', () => {
+            clearInterval(captureInterval);
+            startCaptureBtn.disabled = false;
+            pauseCaptureBtn.disabled = true;
+            downloadBtn.disabled = false;
+            statusDiv.textContent = `Capture paused. Total images: ${images.length}`;
+        });
+
+        // Download Images
+        downloadBtn.addEventListener('click', () => {
+            if (images.length === 0) {
+                alert('No images to download');
+                return;
+            }
+
+            const zip = new JSZip();
+            const datasetName = datasetInput.value.trim() || 'dataset';
+            const imageFolder = zip.folder(datasetName);
+
+            images.forEach((imageDataUrl, index) => {
+                const base64Data = imageDataUrl.split(',')[1];
+                imageFolder.file(`image_${index + 1}.png`, base64Data, { base64: true });
+            });
+
+            zip.generateAsync({ type: 'blob' }).then(content => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = `${datasetName}_images.zip`;
+                link.click();
+            });
+        });
+
+        // Cleanup media stream when page is unloaded
+        window.addEventListener('beforeunload', () => {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
